@@ -191,9 +191,9 @@ df['label'] = df[forecast_col].shift(
 # features apart from label;;CAPITAL X
 X = np.array(df.drop(['label'], 1))  # returns a new df
 X = preprocessing.scale(X)
-X = X[:-forecast_out]
+X = X[:-forecast_out] # everything excluding last 10
 
-X_lately = X[-forecast_out:]  ########new data to test against
+X_lately = X[-forecast_out:]  # new data to test against, last 10
 
 # Last values have NA so we will drop them
 df.dropna(inplace=True)
@@ -207,7 +207,7 @@ X_train, X_test, y_train, y_test = skms.train_test_split(X, y, test_size=0.3)
 clf = LinearRegression(n_jobs=-1)  # runs as many jobs at a time as possible
 clf.fit(X_train, y_train)
 accuracy = clf.score(X_test, y_test)
-# print(accuracy)
+print('accuracy of linear regression model is: ' + accuracy)
 
 acc = accuracy
 
@@ -215,7 +215,7 @@ acc = accuracy
 clf2 = svm.SVR()
 clf2.fit(X_train, y_train)
 accuracy2 = clf2.score(X_test, y_test)
-# print(accuracy2)
+print('accuracy of svm model is: ' + accuracy2)
 
 
 # choosing the model with better accuracy for forecast
@@ -225,24 +225,24 @@ else:
     forecast_set = clf2.predict(X_lately)
     acc = accuracy2
 
-# print(forecast_set, accuracy, forecast_out)
+print('Forecast set of better model: '+ forecast_set, accuracy, forecast_out)
 df['Forecast'] = np.nan
 
-##for x-axis date;; since we droped it for calculation
+# for x-axis date; since we dropped it for calculation
 last_date = df.iloc[-1].name
-last_unix = 0
+last_day_sec = 0
 try:
-    last_unix = last_date.timestamp()
+    last_day_sec = last_date.timestamp()
 except:
     import time
+    last_day_sec = time.mktime(last_date.timetuple())
 
-    last_unix = time.mktime(last_date.timetuple())
 one_day = 86400
-next_unix = last_unix + one_day
+next_day_sec = last_day_sec + one_day
 for i in forecast_set:
-    next_date = dt.datetime.fromtimestamp(next_unix)
-    next_unix += one_day
-    df.loc[next_date] = [np.nan for _ in range(len(df.columns) - 1)] + [i]
+    next_date = dt.datetime.fromtimestamp(next_day_sec)
+    next_day_sec += one_day
+    df.loc[next_day_sec] = [np.nan for _ in range(len(df.columns) - 1)] + [i]
 
 # 100 rolling moving average
 df['100ma'] = df_main['Close'].rolling(window=100,
