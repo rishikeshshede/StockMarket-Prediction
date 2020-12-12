@@ -1,1 +1,3 @@
-# StockMarketPrediction
+# Stock Market Prediction
+
+This System aims to provide professional to beginner traders/investors a basic analysis and prediction of the stock the user wants to possibly invest in or just want to enquire about (system fetches data with the help of 3 different APIs NSE, Yahoo anf Yahoo Finance). System is able to display that particular prediction on a systematic graph and is able predict future low, high points with the help of machine learning and further display them on an interactive GUI. It is able to store this analysis onto a database to reduce future computations related to that particular stock and also utilizing that prior analysis to improve future predictions. System also includes a separate additional feature for user to inculcate his/her intuition into the prediction and possibly improving the accuracy based on that.
