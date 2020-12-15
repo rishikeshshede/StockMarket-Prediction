@@ -123,6 +123,7 @@ def Include_Intuition():
 def take_input():
     global NOS
     NOS = entry1.get()
+    print('You are searching for ' + NOS + ' stock')
     Include_Intuition()
     # root.quit()
     # root.destroy()
@@ -143,16 +144,16 @@ df = pd.DataFrame()
 ##check if NOS data is already present or not
 try:
     df = pd.read_csv(NOS + '.csv')
+    print('reading from stored CSV')
 except:
-    print('csv of this stock not present')
-    # pass
+    print('CSV of this stock is not present')
 
 # Fetching stock data from different APIs
 try:
     import pandas_datareader.data as web
-    df = web.DataReader(NOS, 'yahoo', start, end)
+    df = web.get_data_yahoo(NOS,start=start,end=end)
 except:
-    print('Not able to read data from yahoo API')
+    print('Not able to read data from google API')
     try:
         from nsepy import get_history
 
@@ -161,14 +162,16 @@ except:
         print('Not able to read data from nsepy(NSE) API')
         try:
             import yfinance as yf
-
-            data = yf.download(NOS, start, end)
+            # data = yf.download(NOS, start, end)
+            data = yf.download('AAPL', '2016-01-01','2019-08-01')
         except:
             print('Not able to read data from Yahoo! Finance API')
             tk.messagebox.showwarning('Error!', 'System was not able to find data for the Entered Stock')
             exit()
 
 # save Data of NOS for future Use
+# path = 'D:\Study-Material\Btech\Btech-Project\Stock-Market-Prediction-System\18103050_SMP'
+# df.to_csv(np.os.path.join(path, NOS + '.csv'))
 df.to_csv(NOS + '.csv')
 
 # volatility;percentage change
@@ -183,17 +186,19 @@ df.fillna(-99999, inplace=True)  # making NA/NaN values an outlier
 
 # days we are forecasting forward
 forecast_out = int(math.ceil(0.01 * len(df)))  # last ten days or 10%
-print(forecast_out)
+print('forecast_out: ' + str(forecast_out))
 
 df['label'] = df[forecast_col].shift(
     -forecast_out)  # shifting forecast_col entries upwards and saving to another column: label
 
 # features apart from label;;CAPITAL X
 X = np.array(df.drop(['label'], 1))  # returns a new df
-X = preprocessing.scale(X)
-X = X[:-forecast_out] # everything excluding last 10
 
-X_lately = X[-forecast_out:]  # new data to test against, last 10
+scaler = preprocessing.StandardScaler()
+X = scaler.fit_transform(X)
+X = X[:-forecast_out] # everything excluding last forecast_out #values
+
+X_lately = X[-forecast_out:]  # new data to test against, last forecast_out #values
 
 # Last values have NA so we will drop them
 df.dropna(inplace=True)
@@ -207,15 +212,15 @@ X_train, X_test, y_train, y_test = skms.train_test_split(X, y, test_size=0.3)
 clf = LinearRegression(n_jobs=-1)  # runs as many jobs at a time as possible
 clf.fit(X_train, y_train)
 accuracy = clf.score(X_test, y_test)
-print('accuracy of linear regression model is: ' + accuracy)
+print('accuracy of linear regression model is: ' + str(accuracy))
 
 acc = accuracy
 
 # SVR classifier
-clf2 = svm.SVR()
+clf2 = svm.SVR(gamma='scale')
 clf2.fit(X_train, y_train)
 accuracy2 = clf2.score(X_test, y_test)
-print('accuracy of svm model is: ' + accuracy2)
+print('accuracy of svm model is: ' + str(accuracy2))
 
 
 # choosing the model with better accuracy for forecast
@@ -225,68 +230,57 @@ else:
     forecast_set = clf2.predict(X_lately)
     acc = accuracy2
 
-print('Forecast set of better model: '+ forecast_set, accuracy, forecast_out)
+print('Forecast set of better model: '+ str(forecast_set))
 df['Forecast'] = np.nan
 
 # for x-axis date; since we dropped it for calculation
 last_date = df.iloc[-1].name
-last_day_sec = 0
+last_day_secs = 0
 try:
-    last_day_sec = last_date.timestamp()
+    last_day_secs = last_date.timestamp()
 except:
     import time
-    last_day_sec = time.mktime(last_date.timetuple())
+    last_day_secs = time.mktime(last_date.timetuple())
 
 one_day = 86400
-next_day_sec = last_day_sec + one_day
+next_day_secs = last_day_secs + one_day
 for i in forecast_set:
-    next_date = dt.datetime.fromtimestamp(next_day_sec)
-    next_day_sec += one_day
-    df.loc[next_day_sec] = [np.nan for _ in range(len(df.columns) - 1)] + [i]
+    next_date = dt.datetime.fromtimestamp(next_day_secs)
+    next_day_secs += one_day
+    df.loc[next_date] = [np.nan for _ in range(len(df.columns) - 1)] + [i] # what are we doing here????
 
-# 100 rolling moving average
-df['100ma'] = df_main['Close'].rolling(window=100,
-                                       min_periods=0).mean()  ##moving average;;intial elements will have nan
+# 100 rolling moving average (SMA)
+df['100ma'] = df_main['Close'].rolling(window=100, min_periods=0).mean()  # moving average; initial elements will have nan
 
 df.to_csv(NOS + '_Predicted.csv')
 
 # ========================================================Graph=================================================================#
-# GUI
+# GUI for Prediction
 
 df2 = df
-root = tk.Tk()
-# root.wm_title("Embedding in Tk")
 
-fig = Figure(figsize=(10, 5), dpi=100)
+fig = Figure(figsize=(10, 5))
 ax2 = fig.add_subplot(111)
-canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
 
-
-# Func when Quit is pressed
+# Func to Quit
 def quit2(root):
-    # global root
     root.quit()
     root.destroy()
 
-
 # To display Predicted Graph of the forecasted values
 def predicted_graph():
-    # global root
     root = tk.Tk()
-    # root.wm_title("Embedding in Tk")
 
     fig = Figure(figsize=(10, 5), dpi=100)
     ax2 = fig.add_subplot(111)
-    canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
-    # plotting
-    # Prediction
+
+    # plotting Prediction
     priceMin = df2['Close'].min()
     df2['Close'].plot(kind='line', linewidth=.8, legend=True, ax=ax2, color='#3385ff', fontsize=10)
-    df2['Forecast'].plot(kind='line', linewidth=.7, legend=True, ax=ax2, color='#00e600', fontsize=10)
+    df2['Forecast'].plot(kind='line', linewidth=.7, legend=True, ax=ax2, color='#00af11', fontsize=10)
     ax2.fill_between(df2.index, priceMin, df['Forecast'], facecolor='#33ff33', alpha=0.5)
     ax2.fill_between(df2.index, priceMin, df['Close'], facecolor='#3385ff', alpha=0.5)
 
-    # Navigation toolbar
     canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
@@ -294,46 +288,36 @@ def predicted_graph():
     toolbar.update()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-    # button = tk.Button(master=root, text="Quit", command=terminate, bg='#ff0000', fg='white', font=('helvetica', 11, 'bold'))
-    # button.pack(side=tk.BOTTOM)
-
     button2 = tk.Button(master=root, text="Moving Average Curve", command=lambda: [quit2(root), moving_average_curve()],
-                        bg='#0066ff', fg='white', font=('helvetica', 11, 'bold'))
+                        bg='#00af11', fg='white', font=('helvetica', 11, 'bold'))
     button2.pack(side=tk.BOTTOM)
 
     label_acc = tk.Label(master=root, text='Accuracy Of Model : ' + str(accuracy))
     label_acc.config(font=('helvetica', 12))
-    label_acc.pack(side=tk.RIGHT)
+    label_acc.pack(side=tk.LEFT)
 
-    root.title('Stock Market Predictor')
-    ax2.set_title('Predicted Graph For ' + NOS, color='#ffb31a')
+    root.title('Stock Market Prediction')
+    ax2.set_title('Predicted Graph For ' + NOS, color='#c4651d')
 
     tk.mainloop()
 
 
 # To display Moving average curve
 def moving_average_curve():
-    # global root
     root = tk.Tk()
-    # root.wm_title("Embedding in Tk")
 
     fig = Figure(figsize=(10, 5), dpi=100)
     ax2 = fig.add_subplot(111)
-    canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
 
     df_main['Close'].plot(kind='line', linewidth=.8, legend=True, ax=ax2, color='#3385ff', fontsize=10)
-    df['100ma'].plot(kind='line', linewidth=.7, legend=True, ax=ax2, color='#00e600', fontsize=10)
+    df['100ma'].plot(kind='line', linewidth=.7, legend=True, ax=ax2, color='#00af11', fontsize=10)
 
-    # Navigation toolbar
     canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
     toolbar = NavigationToolbar2Tk(canvas, root)
     toolbar.update()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    # button = tk.Button(master=root, text="Quit", command=terminate, bg='#ff0000', fg='white', font=('helvetica', 11, 'bold'))
-    # button.pack(side=tk.BOTTOM)
 
     button2 = tk.Button(master=root, text="Predicted Graph", command=lambda: [quit2(root), predicted_graph()],
                         bg='#ff9933', fg='white', font=('helvetica', 11, 'bold'))
@@ -341,15 +325,10 @@ def moving_average_curve():
 
     label_acc = tk.Label(master=root, text='Current Moving Average : ' + str(df['100ma'].iloc[-1]))
     label_acc.config(font=('helvetica', 12))
-    label_acc.pack(side=tk.RIGHT)
+    label_acc.pack(side=tk.LEFT)
 
     root.title('Stock Market Predictor')
-    ax2.set_title('Moving Average Curve for ' + NOS, color='#ffb31a')
+    ax2.set_title('Moving Average Curve for ' + NOS, color='#c4651d')
     tk.mainloop()
 
-
 predicted_graph()
-
-tk.mainloop()
-root.quit()
-root.destroy()
